@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "65 nm PMOS: Short-Channel Effects Simulation"
+type: software
+authors:
+  - given-names: Abdullah
+    family-names: Afifi
+  - given-names: Ahmed
+    family-names: Yasser
+  - given-names: Mohamad
+    family-names: Ibrahim
+  - given-names: Ammar
+    family-names: AbdElaal
+  - given-names: Omar
+    family-names: Ashraf
+date-released: 2026-01-01
+license: MIT
+keywords: [TCAD, Silvaco ATLAS, PMOS, short-channel effects, DIBL, 65 nm]

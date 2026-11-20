@@ -1,0 +1,1130 @@
+go atlas simflags = "-p 12"
+
+# Parameter definition (65 [nm] technology node values)
+
+set scaling_factor_k = 65/90
+set channel_length = 0.090*$"scaling_factor_k"
+set gate_ox_thickness = 0.002*$"scaling_factor_k"
+
+set source_drain_length = $"channel_length"*1.5
+set source_drain_junc_depth = 0.060*$"scaling_factor_k"
+
+set source_drain_doping = 1e19/($"scaling_factor_k"**2)
+
+set electrode_length = $"channel_length"*$"scaling_factor_k"
+set electrode_height = 0.02
+
+set substrate_depth = 0.2*$"scaling_factor_k"
+set substrate_doping = 1e18/($"scaling_factor_k"**2)
+
+set Qss = 5e10
+set Vdd = 1.2
+
+Set GateFrequency=1e3
+#______________ A. Structure definition ______________
+
+#1. Mesh initialization
+#---------------------------------------------------
+# X-direction mesh (CRITICAL for tunneling)
+#---------------------------------------------------
+mesh space.mult=1.0 width=10*$"channel_length"
+
+# Global boundaries
+x.mesh loc=0.00 spac=0.05
+x.mesh loc=2*$"source_drain_length"+$"channel_length" spac=0.05
+
+# Source-channel interface
+x.mesh loc=$"source_drain_length" spac=0.002
+
+# Drain-channel interface
+x.mesh loc=$"source_drain_length"+$"channel_length" spac=0.002
+
+# Dense lateral mesh INSIDE gate oxide / channel (REQUIRED)
+x.mesh loc=$"source_drain_length"+0.05*$"channel_length" spac=0.001
+x.mesh loc=$"source_drain_length"+0.15*$"channel_length" spac=0.001
+x.mesh loc=$"source_drain_length"+0.25*$"channel_length" spac=0.001
+x.mesh loc=$"source_drain_length"+0.35*$"channel_length" spac=0.001
+x.mesh loc=$"source_drain_length"+0.45*$"channel_length" spac=0.001
+x.mesh loc=$"source_drain_length"+0.55*$"channel_length" spac=0.001
+x.mesh loc=$"source_drain_length"+0.65*$"channel_length" spac=0.001
+x.mesh loc=$"source_drain_length"+0.75*$"channel_length" spac=0.001
+x.mesh loc=$"source_drain_length"+0.85*$"channel_length" spac=0.001
+x.mesh loc=$"source_drain_length"+0.95*$"channel_length" spac=0.001
+
+#---------------------------------------------------
+# Y-direction mesh (oxide + channel refinement)
+#---------------------------------------------------
+
+# Vacuum above gate
+y.mesh loc=-0.05 spac=0.01
+
+# Oxide region — VERY fine mesh (mandatory)
+y.mesh loc=-$"gate_ox_thickness" spac=0.0002
+y.mesh loc=-0.75*$"gate_ox_thickness" spac=0.0002
+y.mesh loc=-0.50*$"gate_ox_thickness" spac=0.0002
+y.mesh loc=-0.25*$"gate_ox_thickness" spac=0.0002
+y.mesh loc=0.00 spac=0.0002
+
+# Silicon surface and channel
+y.mesh loc=0.002 spac=0.002
+y.mesh loc=0.005 spac=0.003
+y.mesh loc=0.010 spac=0.005
+y.mesh loc=0.015 spac=0.005
+y.mesh loc=0.030 spac=0.01
+y.mesh loc=0.060 spac=0.02
+y.mesh loc=0.100 spac=0.03
+
+# Substrate bottom
+y.mesh loc=$"substrate_depth" spac=0.1
+
+#drain-channel interface (If you specify 3 decimal digits after the decimal point, Silvaco will give you an error in the mesh, and it will tell you the error is in the line directly after the last mesh line written, whatever that code line after the mesh was!)
+
+#2. Region initialization
+
+#Vacuum region
+region number=1  material=Vac
+
+#Substrate region
+region number=2 x.min=0.00 x.max=2*$"source_drain_length" + $"channel_length" y.min=0 y.max=$"substrate_depth" material=Silicon name=substrate_bulk
+
+#Source region
+region number=3 x.min=0.00 x.max=$"source_drain_length" y.min=0 y.max=$"source_drain_junc_depth" material=silicon name = source_bulk
+
+#Drain region
+region number=4 x.min=$"source_drain_length" + $"channel_length" x.max=2*$"source_drain_length" + $"channel_length" y.min=0 y.max=$"source_drain_junc_depth" material=silicon name = drain_bulk
+
+#Oxide region
+region number=5 x.min=$"source_drain_length" x.max=$"source_drain_length" + $"channel_length" y.min=-$"gate_ox_thickness" y.max=0.00 material=SiO2 name = oxide
+
+#Polysilicon gate electrode
+region number=6 x.min=$"source_drain_length" x.max=$"source_drain_length" + $"channel_length" y.min=-1 y.max=-$"gate_ox_thickness" material=poly name = gate_electrode
+
+
+#Polysilicon Source Electrode
+region number=7 x.min=0 x.max=$"electrode_length" y.min=-$"electrode_height" y.max=0 material=Alum name = source_electrode
+
+
+#Polysilicon Drain Electrode
+region number=8 x.min=2*$"source_drain_length" + $"channel_length" -$"electrode_length"  x.max=2*$"source_drain_length" + $"channel_length" y.min=-$"electrode_height" y.max=0 material=Alum name = drain_electrode
+
+
+
+#3. Electrode definition
+electrode name=gate   region = gate_electrode
+electrode name=drain  region = drain_electrode
+electrode name=source region = source_electrode
+electrode name=bulk bottom
+
+
+
+#4. Doping
+
+#A. Substrate doping
+doping uniform conc=$"substrate_doping" n.type region=substrate_bulk
+
+#B. Source and drain doping
+doping uniform conc=$"source_drain_doping" p.type region=source_bulk
+doping uniform conc=$"source_drain_doping" p.type region=drain_bulk
+
+
+
+#______________ B. Material and physical model definition ______________
+
+#1. Material parameter value definition
+material silicon EG300=1.12 permittivity=11.7 ni=6.68e9
+
+#2. Contact material (electrode material) parameter definition
+contact name=gate p.poly
+
+#Let the source and drain regions be perfect ohmic contacts, because no material was selected for the here.
+contact name=source
+contact name=drain
+contact name=bulk
+
+#Probe creation
+probe name="Electron con"  N.conc x=$"source_drain_length" + $"channel_length"/2 y=0.0000001
+probe name="Hole con"  P.conc x=$"source_drain_length" + $"channel_length"/2 y=0.0000001
+
+#3. oxide interface charge
+interface x.min= $"source_drain_length" x.max= $"source_drain_length" + $"channel_length" y.min=-$"gate_ox_thickness"/2 y.max=0.005 qf=$"Qss"
+
+
+#4.1 Physical models and equations to be solved solutions
+models MOS fermi CVT print auger srh
+
+#4.2 Physical parameters we want Silvaco to make available for plotting
+output CON.BAND VAL.BAND U.SRH QFN QFP band.param QSS
+
+
+
+
+#______________ C. Numerical Method Selection ______________
+method newton maxtrap=10 climit=1e-4
+
+
+
+
+
+# ==========================================================
+# I-V Characteristics Curve
+# ==========================================================
+
+# --- Curve A: Linear Region (Vds = -50 mV) ---
+solve init
+# Set Drain to -50mV (Linear region)
+solve vdrain=-0.05
+# Sweep Gate from 0 to -1.2V
+log outf=Ids_Vgs_Vd_50mV.log
+solve vgate=0 vstep=-0.01 vfinal=-1.2 name=gate
+log off
+
+#extraction on the linear region transfer curve (Vds = -50 mV)
+extract init infile="Ids_Vgs_Vd_50mV.log"
+extract name="SS_linear_mV/dec" 1000.0 / slope(maxslope(curve(abs(v."gate"), log10(abs(i."drain")))))
+
+# --- Curve B: Saturation Region (Vds = -1.2 V) ---
+solve init
+# Ramp Drain to -1.2V (Saturation region)
+solve vdrain=0 vstep=-0.1 vfinal=-1.2 name=drain
+# Sweep Gate from 0 to -1.2V
+log outf=Ids_Vgs_Vd_1.2V.log
+solve vgate=0 vstep=-0.01 vfinal=-1.2 name=gate
+log off
+
+#Subthreshold Swing from Saturation Region (Vds = -1.2 V)
+
+extract init infile="Ids_Vgs_Vd_1.2V.log"
+extract name="SS_sat_mV/dec" 1000.0 / slope(maxslope(curve(abs(v."gate"), log10(abs(i."drain")))))
+
+# Plot Ids-Vgs
+tonyplot -overlay Ids_Vgs_Vd_50mV.log Ids_Vgs_Vd_1.2V.log -set "log scale"
+
+
+# Note: We use abs() because PMOS current and voltage are negative
+# ==========================================================
+# 3. Ids-Vds Characteristics (Output Curve)
+#Target Vgs: -0.5, -0.8, -1.0, -1.2 V
+# ==========================================================
+
+# --- Curve 1: Vgs = -0.5 V ---
+solve init
+solve vgate=-0.5
+log outf=Ids_Vds_Vg_0.5V.log
+solve vdrain=0 vstep=-0.05 vfinal=-1.2 name=drain
+log off
+
+# --- Curve 2: Vgs = -0.8 V ---
+solve init
+solve vgate=-0.5 vstep=-0.1 vfinal=-0.8 name=gate
+log outf=Ids_Vds_Vg_0.8V.log
+solve vdrain=0 vstep=-0.05 vfinal=-1.2 name=drain
+log off
+
+# --- Curve 3: Vgs = -1.0 V ---
+solve init
+solve vgate=-0.5 vstep=-0.1 vfinal=-1.0 name=gate
+log outf=Ids_Vds_Vg_1.0V.log
+solve vdrain=0 vstep=-0.05 vfinal=-1.2 name=drain
+log off
+
+# --- Curve 4: Vgs = -1.2 V ---
+solve init
+solve vgate=-0.5 vstep=-0.1 vfinal=-1.2 name=gate
+log outf=Ids_Vds_Vg_1.2V.log
+solve vdrain=0 vstep=-0.05 vfinal=-1.2 name=drain
+log off
+
+# Plot Ids-Vds family of curves
+tonyplot -overlay Ids_Vds_Vg_0.5V.log Ids_Vds_Vg_0.8V.log Ids_Vds_Vg_1.0V.log Ids_Vds_Vg_1.2V.log
+
+
+
+#_________________________________________V_TH temp variation analysis__________________________________________
+
+probe lat.temp X=0.125 Y=0.0001
+PROBE name="Electron Concentration (/cm^3)"	N.CONC X=0.125 Y=0.00001
+PROBE name="Hole Concentration (/cm^3)"		P.CONC X=0.125 Y=0.00001
+
+save outf= MOSFET_STRUCT.str
+
+
+#_____ TEMP Analysis @300K _____
+go atlas
+
+mesh infile=MOSFET_STRUCT.str
+contact name=gate p.poly
+interface x.min=$"source_drain_length" x.max=$"source_drain_length" + $"channel_length" qf=$"Qss"
+models MOS fermi CVT print
+models temperature=300 kla analytic
+
+
+probe lat.temp X=0.125 Y=0.0001
+PROBE name="Electron Concentration (/cm^3)"	N.CONC X=0.125 Y=0.00001
+PROBE name="Hole Concentration (/cm^3)"		P.CONC X=0.125 Y=0.00001
+
+solve init
+solve vstep=-0.1 vfinal=-0.7 name=drain
+
+solve vgate=0 vstep=0.1 vfinal=1.2 name=gate
+log outf= ID_VGS_TEMP300.log
+solve  vstep=-0.1 vfinal=-1.2 name=gate
+log off
+solve  vstep=-0.1 vfinal=-1 name=gate
+solve vstep=0.1 vfinal=0.3 name=drain
+log outf= ID_VDS_TEMP300.log
+solve vstep=-0.1 vfinal=-1.2 name=drain
+log off
+extract init infile="ID_VGS_TEMP300.log"
+extract name="VTP_AT_TEMP_300" x.val from curve(v."gate", probe."Hole Concentration (/cm^3)") where y.val=$"substrate_doping"
+
+extract name="VFB_AT_TEMP_300" x.val from curve(v."gate", probe."Electron Concentration (/cm^3)") where y.val=$"substrate_doping"
+
+extract name="VDep_AT_TEMP_300" x.val from curve(v."gate", probe."Electron Concentration (/cm^3)" - probe."Electron Concentration (/cm^3)") where y.val=0
+#_____ TEMP Analysis @350K _____
+go atlas
+
+mesh infile=MOSFET_STRUCT.str
+contact name=gate p.poly
+interface x.min=$"source_drain_length" x.max=$"source_drain_length" + $"channel_length" qf=$"Qss"
+models MOS fermi CVT print
+models temperature=350 kla analytic
+
+
+probe lat.temp X=0.125 Y=0.0001
+PROBE name="Electron Concentration (/cm^3)"	N.CONC X=0.125 Y=0.00001
+PROBE name="Hole Concentration (/cm^3)"		P.CONC X=0.125 Y=0.00001
+
+solve init
+solve vstep=-0.1 vfinal=-0.7 name=drain
+
+solve vgate=0 vstep=0.1 vfinal=1.2 name=gate
+log outf= ID_VGS_TEMP350.log
+solve  vstep=-0.1 vfinal=-1.2 name=gate
+log off
+solve  vstep=-0.1 vfinal=-1 name=gate
+solve vstep=0.1 vfinal=0.3 name=drain
+log outf= ID_VDS_TEMP350.log
+solve vstep=-0.1 vfinal=-1.2 name=drain
+log off
+extract init infile="ID_VGS_TEMP350.log"
+extract name="VTP_AT_TEMP_350" x.val from curve(v."gate", probe."Hole Concentration (/cm^3)") where y.val=$"substrate_doping"
+
+extract name="VFB_AT_TEMP_350" x.val from curve(v."gate", probe."Electron Concentration (/cm^3)") where y.val=$"substrate_doping"
+
+extract name="VDep_AT_TEMP_350" x.val from curve(v."gate", probe."Electron Concentration (/cm^3)" - probe."Electron Concentration (/cm^3)") where y.val=0
+
+#_____ TEMP Analysis @400K _____
+go atlas
+
+mesh infile=MOSFET_STRUCT.str
+contact name=gate p.poly
+interface x.min=$"source_drain_length" x.max=$"source_drain_length" + $"channel_length" qf=$"Qss"
+models MOS fermi CVT print
+models temperature=400 kla analytic
+
+
+probe 						lat.temp X=0.125 Y=0.0001
+PROBE name="Electron Concentration (/cm^3)"	N.CONC   X=0.125 Y=0.00001
+PROBE name="Hole Concentration (/cm^3)"		P.CONC   X=0.125 Y=0.00001
+
+solve init
+solve vstep=-0.1 vfinal=-0.7 name=drain
+
+solve vgate=0 vstep=0.1 vfinal=1.2 name=gate
+log outf= ID_VGS_TEMP400.log
+solve  vstep=-0.1 vfinal=-1.2 name=gate
+log off
+solve  vstep=-0.1 vfinal=-1 name=gate
+solve vstep=0.1 vfinal=0.3 name=drain
+log outf= ID_VDS_TEMP400.log
+solve vstep=-0.1 vfinal=-1.2 name=drain
+log off
+extract init infile="ID_VGS_TEMP400.log"
+extract name="VTP_AT_TEMP_400" x.val from curve(v."gate", probe."Hole Concentration (/cm^3)") where y.val=$"substrate_doping"
+
+extract name="VFB_AT_TEMP_400" x.val from curve(v."gate", probe."Electron Concentration (/cm^3)") where y.val=$"substrate_doping"
+
+extract name="VDep_AT_TEMP_400" x.val from curve(v."gate", probe."Electron Concentration (/cm^3)" - probe."Electron Concentration (/cm^3)") where y.val=0
+
+#_____ TEMP Analysis @450K _____
+go atlas
+
+mesh infile=MOSFET_STRUCT.str
+contact name=gate p.poly
+interface x.min=$"source_drain_length" x.max=$"source_drain_length" + $"channel_length" qf=$"Qss"
+models MOS fermi CVT print
+models temperature=450 kla analytic
+
+
+probe lat.temp X=0.125 Y=0.0001
+PROBE name="Electron Concentration (/cm^3)"	N.CONC X=0.125 Y=0.00001
+PROBE name="Hole Concentration (/cm^3)"		P.CONC X=0.125 Y=0.00001
+
+solve init
+solve vstep=-0.1 vfinal=-0.7 name=drain
+
+solve vgate=0 vstep=0.1 vfinal=1.2 name=gate
+log outf= ID_VGS_TEMP450.log
+solve  vstep=-0.1 vfinal=-1.2 name=gate
+log off
+solve  vstep=-0.1 vfinal=-1 name=gate
+solve vstep=0.1 vfinal=0.3 name=drain
+log outf= ID_VDS_TEMP450.log
+solve vstep=-0.1 vfinal=-1.2 name=drain
+log off
+extract init infile="ID_VGS_TEMP450.log"
+extract name="VTP_AT_TEMP_450" x.val from curve(v."gate", probe."Hole Concentration (/cm^3)") where y.val=$"substrate_doping"
+
+extract name="VFB_AT_TEMP_450" x.val from curve(v."gate", probe."Electron Concentration (/cm^3)") where y.val=$"substrate_doping"
+
+extract name="VDep_AT_TEMP_450" x.val from curve(v."gate", probe."Electron Concentration (/cm^3)" - probe."Electron Concentration (/cm^3)") where y.val=0
+
+#_____ TEMP Analysis @500K _____
+go atlas
+
+mesh infile=MOSFET_STRUCT.str
+contact name=gate p.poly
+interface x.min=$"source_drain_length" x.max=$"source_drain_length" + $"channel_length" qf=$"Qss"
+models MOS fermi CVT print
+models temperature=500 kla analytic
+
+
+probe lat.temp X=0.125 Y=0.0001
+PROBE name="Electron Concentration (/cm^3)"	N.CONC X=0.125 Y=0.00001
+PROBE name="Hole Concentration (/cm^3)"		P.CONC X=0.125 Y=0.00001
+
+solve init
+solve vstep=-0.1 vfinal=-0.7 name=drain
+
+solve vgate=0 vstep=0.1 vfinal=1.2 name=gate
+log outf= ID_VGS_TEMP500.log
+solve  vstep=-0.1 vfinal=-1.2 name=gate
+log off
+solve  vstep=-0.1 vfinal=-1 name=gate
+solve vstep=0.1 vfinal=0.3 name=drain
+log outf= ID_VDS_TEMP500.log
+solve vstep=-0.1 vfinal=-1.2 name=drain
+log off
+extract init infile="ID_VGS_TEMP500.log"
+extract name="VTP_AT_TEMP_500" x.val from curve(v."gate", probe."Hole Concentration (/cm^3)") where y.val=$"substrate_doping"
+
+extract name="VFB_AT_TEMP_500" x.val from curve(v."gate", probe."Electron Concentration (/cm^3)") where y.val=$"substrate_doping"
+
+extract name="VDep_AT_TEMP_500" x.val from curve(v."gate", probe."Electron Concentration (/cm^3)" - probe."Electron Concentration (/cm^3)") where y.val=0
+
+#_____ TEMP Analysis @550K _____
+go atlas
+
+mesh infile=MOSFET_STRUCT.str
+contact name=gate p.poly
+interface x.min=$"source_drain_length" x.max=$"source_drain_length" + $"channel_length" qf=$"Qss"
+models MOS fermi CVT print
+models temperature=550 kla analytic
+output CON.BAND VAL.BAND U.SRH QFN QFP band.param QSS
+
+
+probe lat.temp X=0.125 Y=0.0001
+PROBE name="Electron Concentration (/cm^3)"	N.CONC X=0.125 Y=0.00001
+PROBE name="Hole Concentration (/cm^3)"		P.CONC X=0.125 Y=0.00001
+
+solve init
+solve vstep=-0.1 vfinal=-0.7 name=drain
+
+solve vgate=0 vstep=0.1 vfinal=1.2 name=gate
+log outf= ID_VGS_TEMP550.log
+solve  vstep=-0.1 vfinal=-1.2 name=gate
+log off
+solve  vstep=-0.1 vfinal=-1 name=gate
+solve vstep=0.1 vfinal=0.3 name=drain
+log outf= ID_VDS_TEMP550.log
+solve vstep=-0.1 vfinal=-1.2 name=drain
+log off
+extract init infile="ID_VGS_TEMP550.log"
+extract name="VTP_AT_TEMP_550" x.val from curve(v."gate", probe."Hole Concentration (/cm^3)") where y.val=$"substrate_doping"
+
+extract name="VFB_AT_TEMP_550" x.val from curve(v."gate", probe."Electron Concentration (/cm^3)") where y.val=$"substrate_doping"
+
+extract name="VDep_AT_TEMP_550" x.val from curve(v."gate", probe."Electron Concentration (/cm^3)" - probe."Electron Concentration (/cm^3)") where y.val=0
+
+
+
+tonyplot -overlay ID_VGS_TEMP550.log ID_VGS_TEMP500.log ID_VGS_TEMP450.log ID_VGS_TEMP400.log ID_VGS_TEMP350.log ID_VGS_TEMP300.log 
+tonyplot -overlay ID_VDS_TEMP550.log ID_VDS_TEMP500.log ID_VDS_TEMP450.log ID_VDS_TEMP400.log ID_VDS_TEMP350.log ID_VDS_TEMP300.log 
+save outf = struc.str
+###################################################################################################################################################################################################################
+######################################################
+#______________ Tunneling Analysis  ______________
+
+# Self-consistent electrons and holes - forward bias
+
+go atlas 
+mesh infile=MOSFET_STRUCT.str
+contact name=gate p.poly
+interface x.min=$"source_drain_length" x.max=$"source_drain_length" + $"channel_length" qf=$"Qss"
+#set the workfunction and effective masses for the top contact
+
+#set models including self-consistent electron tunnelling
+models MOS fermi CVT
+models temperature=300 kla analytic
+models print conmob fldmob consrh qtnlsc.el qtnlsc.ho  qtnl.derivs
+
+#set some parameters to help convergence 
+method newton clim.dd=1e8 dvmax=0.1
+output CON.BAND VAL.BAND U.SRH QFN QFP band.param
+# Get I-V curves
+
+solve init
+solve vstep=-0.1 vfinal=-0.7 name=drain
+
+solve vgate=0 vstep=0.1 vfinal=2.2 name=gate
+# Go up to a forward bias of -1.2 Volts
+log outfile=Electron_Hole_tunneling.log j.hole j.electron j.tun 
+solve vstep=-0.05 vfinal=-1.2 name=gate
+log off
+save outf=tunnel.str
+#
+tonyplot -append Electron_Hole_tunneling.log ID_VGS_TEMP300.log
+
+
+
+#__________________________________________________________________________
+#______________ D. solve the equations ______________
+
+solve init outf=solution_at_equilibrium
+
+#______________ D. Extract Results ______________
+
+#Structure at equilibrium
+save outf=00_65nm_structure.str
+#tonyplot 00_65nm_structure.str
+
+###_________________IV_characteristics_________________________
+#1. ID-VGS Charcterstics 
+
+#solve vstep=-.25 vfinal=-1 name=drain 
+#
+#log outf = 0.ID_VGS_Charcterstics.log 
+#solve  vstep=-0.1 vfinal=-7 name=gate 
+#log off
+#
+#tonyplot 0.ID_VGS_Charcterstics.log
+
+###2. ID-VDS Charcterstics 
+solve vgate=0 vstep=-0.2 vfinal=-2 name=gate 
+solve vdrain=0
+
+log outf = 1.ID_VDS_Charcterstics.log 
+solve 	 vstep=-0.1 vfinal=-1.1 name=drain 
+
+#Plot the electric field at velocity saturation
+save outf=E_field_at_vel_sat.str
+
+solve  vstep=-0.1 vfinal=-6 name=drain 
+log off
+
+tonyplot 1.ID_VDS_Charcterstics.log -set ID_VDS_set.set
+tonyplot E_field_at_vel_sat.str
+
+
+
+#______________DIBL analysis______________
+
+load infile=solution_at_equilibrium
+
+#IV curves for DIBL
+#Curve for VD=-0.5
+solve vdrain=-0.25
+solve vdrain=-0.5
+
+#Setting vgate before the log file starts recording and not inside the voltage sweep avoids glitches in the plots.
+solve vgate=0
+
+log outf = 01_ID_VGS_V_drain0v5.log
+#These curves in this sweep are used to plot the energy band diagram for the PMOS device
+save outf=10_ID_VGS_V_drain0v5_gate0.str
+
+solve vstep=-0.1 vfinal=-1 name=gate
+save outf=11_ID_VGS_V_drain0v5_gate1.str
+
+solve vstep=-0.1 vfinal=-2 name=gate
+save outf=12_ID_VGS_V_drain0v5_gate2.str
+
+solve vstep=-0.1 vfinal=-3 name=gate
+save outf=13_ID_VGS_V_drain0v5_gate3.str
+
+log off
+
+#Plot energy bands for a -0.5[V] V_drain PMOS for various values of V_G
+tonyplot 10_ID_VGS_V_drain0v5_gate0.str 11_ID_VGS_V_drain0v5_gate1.str 12_ID_VGS_V_drain0v5_gate2.str 13_ID_VGS_V_drain0v5_gate3.str -set energy_band_set.set
+
+
+save outf=01_ID_VGS_V_drain0v5.str
+
+
+
+#Curve for VD=-0.5
+solve vdrain=-0.75
+solve vdrain=-1
+
+solve vgate=0
+log outf = 02_ID_VGS_V_drain1.log
+solve vstep=-0.1 vfinal=-3 name=gate
+log off
+save outf=02_ID_VGS_V_drain1.str
+
+
+
+#Curve for VD=-1.5
+solve vdrain=-1.25
+solve vdrain=-1.5
+
+solve vgate=0
+log outf = 03_ID_VGS_V_drain1v5.log
+solve vstep=-0.1 vfinal=-3 name=gate
+log off
+save outf=03_ID_VGS_V_drain1v5.str
+
+
+
+#Curve for VD=-2
+solve vdrain=-1.75
+solve vdrain=-2
+
+solve vgate=0
+log outf = 04_ID_VGS_V_drain2.log
+solve vstep=-0.1 vfinal=-3 name=gate
+log off
+save outf=04_ID_VGS_V_drain2.str
+
+
+
+#Curve for VD=-2.5
+solve vdrain=-2.25
+solve vdrain=-2.5
+
+solve vgate=0
+log outf = 05_ID_VGS_V_drain2v5.log
+solve vstep=-0.1 vfinal=-3 name=gate
+log off
+save outf=05_ID_VGS_V_drain2v5.str
+
+
+
+#Curve for VD=-3
+solve vdrain=-2.75
+solve vdrain=-3
+solve vgate=0
+
+log outf = 06_ID_VGS_V_drain3.log
+
+#These curves in this sweep are used to plot the energy band diagram for the PMOS device
+save outf=10_ID_VGS_V_drain3_gate0.str
+
+solve vstep=-0.1 vfinal=-1 name=gate
+save outf=11_ID_VGS_V_drain3_gate1.str
+
+solve vstep=-0.1 vfinal=-2 name=gate
+save outf=12_ID_VGS_V_drain3_gate2.str
+
+solve vstep=-0.1 vfinal=-3 name=gate
+save outf=13_ID_VGS_V_drain3_gate3.str
+
+save outf=06_ID_VGS_V_drain3.str
+
+#Plot energy bands for a -3[V] V_drain PMOS for various values of V_G (This and the previous tonyplot indicate stark differences in the band diagram due to lowering).
+tonyplot 10_ID_VGS_V_drain3_gate0.str 11_ID_VGS_V_drain3_gate1.str 12_ID_VGS_V_drain3_gate2.str 13_ID_VGS_V_drain3_gate3.str -set energy_band_set.set
+log off
+
+
+#Plot the ID-VGS DIBL curves and structure files
+tonyplot -overlay 01_ID_VGS_V_drain0v5.log 02_ID_VGS_V_drain1.log 03_ID_VGS_V_drain1v5.log 04_ID_VGS_V_drain2.log 05_ID_VGS_V_drain2v5.log 06_ID_VGS_V_drain3.log
+
+#Electric field plots
+tonyplot 01_ID_VGS_V_drain0v5.str 02_ID_VGS_V_drain1.str 03_ID_VGS_V_drain1v5.str 04_ID_VGS_V_drain2.str 05_ID_VGS_V_drain2v5.str 06_ID_VGS_V_drain3.str -set E_field.set
+
+
+
+#______Extract VTH values for DIBL calcuation__________
+
+#1.Get V_T for V_D = 0[V]
+load infile=solution_at_equilibrium
+
+solve vdrain=0
+
+solve vgate=0 vstep=0.1 vfinal=1 name=gate
+log outf = 00Electron_hole_con_vs_VG_VD_0.log
+solve vstep =-0.1 vfinal=-4 name=gate
+log off
+
+extract init infile="00Electron_hole_con_vs_VG_VD_0.log"
+extract name="VTP0" x.val from curve(v."gate", probe."Hole con") where y.val=$"substrate_doping"
+
+##2.Get V_T for V_D = -1.5[V]
+#load infile=solution_at_equilibrium
+#
+#solve vdrain=0 vstep=-0.1 vfinal=-1.5 name=drain
+#
+#solve vgate=0 vstep=0.1 vfinal=1 name=gate
+#log outf = 01Electron_hole_con_vs_VG_VD2.log
+#solve vstep =-0.1 vfinal=-4 name=gate
+#log off
+#
+#extract init infile="00Electron_hole_con_vs_VG_VD2.log"
+#extract name="VTP1" x.val from curve(v."gate", probe."Hole con") where y.val=$"substrate_doping"
+#
+##1.Get V_T for V_D = -2.5[V]
+#load infile=solution_at_equilibrium
+#
+#solve vdrain=0 vstep=-0.1 vfinal=-2.5 name=drain
+#
+#solve vgate=0 vstep=0.1 vfinal=1 name=gate
+#log outf = 01Electron_hole_con_vs_VG_VD25.log
+#solve vstep =-0.1 vfinal=-4 name=gate
+#log off
+#
+#extract init infile="01Electron_hole_con_vs_VG_VD25.log"
+#extract name="VTP2" x.val from curve(v."gate", probe."Hole con") where y.val=$"substrate_doping"
+#
+#set DIBL = (($"VTP1") - ($"VTP2"))/(-2.5-(-2))
+#
+#tonyplot -overlay 00Electron_hole_con_vs_VG_VD2.log 01Electron_hole_con_vs_VG_VD25.log
+
+#3. CV Characterestics
+
+# Starting the AC analysis
+#C_V_HighFreq_Characteristics_at_drain0
+solve vgate=0 outf=solve_temp_vgate
+solve vgate=0.5 outf=solve_temp_gate0.5
+solve vgate=1 outf=solve_temp_vgate1
+solve vgate=1.5 outf=solve_temp_vgate1.5
+solve vgate=2 outf=solve_temp_vgate2
+solve vgate=2.5 outf=solve_temp_vgate2.5
+solve vgate=3 	outf=solve_temp_gatebias
+log outf = C_V_HighFreq_Characteristics_at_drain0.log
+solve vstep=-0.1 vfinal=-3.0 name=gate AC freq=$"GateFrequency" ANAME=gate
+tonyplot C_V_HighFreq_Characteristics_at_drain0.log
+log off
+
+#C_V_LowFreq_Characteristics_at_drain0
+load infile=solve_temp_vgate
+solve prev
+load infile=solve_temp_gatebias
+log outf = C_V_LowFreq_Characteristics_at_drain0.log
+solve vstep=0.1 vfinal=3.0 name=gate QSCV
+tonyplot C_V_LowFreq_Characteristics_at_drain0.log
+log off
+
+###C_V_highFreq_Characteristics_at_2_vds
+##load infile=solve_temp_init
+#solve vdrain=0 outf=solve_temp_vdrain0
+#solve vdrain=0.5 outf=solve_temp_vdrain0.5
+#solve vdrain=1 outf=solve_temp_vdrain1
+#solve vdrain=1.5 outf=solve_temp_vdrain1.5
+#solve vdrain=2 outf=solve_temp_vdrain2
+#solve vgate=0 vstep=-0.25 vfinal=-3 name=gate
+#log outf = C_V_HighFreq_Characteristics_at_drain0.log
+#solve vstep=0.1 vfinal=3.0 name=gate AC freq=$"GateFrequency" ANAME=gate
+#tonyplot C_V_HighFreq_Characteristics_at_drain0.log
+
+
+##############################################################
+
+############################
+# LOW-FREQ (Quasi-static) C-V
+############################
+#load infile=solution_at_equilibrium
+
+solve vsource=0 name=source
+solve vdrain =0 name=drain
+solve vbulk  =0 name=bulk
+
+solve vgate=0
+solve vgate=0.1
+solve vgate=0.5
+solve vgate=1.0
+solve vgate=+$"Vdd" name=gate
+solve vgate=2.0
+solve vgate=3.0
+
+log outf=CV_QSCV_lowfreq.log
+solve vstep=-0.1 vfinal=-3*$"Vdd" name=gate qscv
+log off
+
+ 
+tonyplot CV_QSCV_lowfreq.log
+
+############################
+# HIGH-FREQ (AC) C-V
+############################
+load infile=solution_at_equilibrium
+
+solve vsource=0 name=source
+solve vdrain =0 name=drain
+solve vbulk  =0 name=bulk
+
+solve vgate=0
+solve vgate=0.1
+solve vgate=0.5
+solve vgate=1.0
+solve vgate=2.0
+solve vgate=3.0
+
+log outf=CV_AC_highfreq_1MHz.log
+solve vstep=-0.1 vfinal=-3.0 name=gate AC freq=$"GateFrequency" ANAME=gate
+log off
+
+
+tonyplot CV_AC_highfreq_1MHz.log
+
+
+##################################################################
+###S/D junction depth  impact on Vth (depths: 20, 40, 60, and 90 nm).
+####################################################################
+##JD=20nm
+#log outf=idvg_jd20.log
+#
+#solve vdrain=-$"Vdd"
+#solve vgate=0
+#solve vstep=-0.05 vfinal=-$"Vdd" name=gate
+#
+#log off
+#
+#set IDCRIT = 1e-6
+#extract init infile="idvg_jd20.log"
+#extract name="VTH_JD20" x.val from curve(v."gate", i."drain") where y.val=-$"IDCRIT"
+################################
+##JD=40nm
+#log outf=idvg_jd40.log
+#
+#solve vdrain=-$"Vdd"
+#solve vgate=0
+#solve vstep=-0.05 vfinal=-$"Vdd" name=gate
+#
+#log off
+#
+#extract init infile="idvg_jd40.log"
+#extract name="VTH_JD40" x.val from curve(v."gate", i."drain") where y.val=-$"IDCRIT"
+###############################
+##JD=60nm
+#log outf=idvg_jd60.log
+#
+#solve vdrain=-$"Vdd"
+#solve vgate=0
+#solve vstep=-0.05 vfinal=-$"Vdd" name=gate
+#
+#log off
+#
+#extract init infile="idvg_jd60.log"
+#extract name="VTH_JD60" x.val from curve(v."gate", i."drain") where y.val=-$"IDCRIT"
+#############################
+##JD =90nm
+#log outf=idvg_jd90.log
+#
+#solve vdrain=-$"Vdd"
+#solve vgate=0
+#solve vstep=-0.05 vfinal=-$"Vdd" name=gate
+#
+#log off
+#
+#extract init infile="idvg_jd90.log"
+#extract name="VTH_JD90" x.val from curve(v."gate", i."drain") where y.val=-$"IDCRIT"
+#############################
+
+
+
+
+
+
+
+
+
+############################################################
+# MU_EFF
+############################################################
+#
+## --- Gate sweep settings ---
+#set VG_START = 0
+#set VG_STOP  = -3.0
+#set VG_STEP  = -0.05
+#
+## --- Linear-region VDS points for mobility extraction ---
+## 
+#set VD1 = -0.05
+#set VD2 = -0.10
+#set VD3 = -0.20
+#set VD4 = -0.50
+#
+#############################
+##sweep
+#############################
+#
+## ---- VDS = -0.05 ----
+#load infile=solution_at_equilibrium
+#solve vgate=0 name=gate
+#solve vdrain=0 name=drain
+#solve vdrain=$"VD1" name=drain
+#
+#log outf=MU_IDVGS_VDS_0p05.log
+#solve vgate=$"VG_START" name=gate
+#solve vstep=$"VG_STEP" vfinal=$"VG_STOP" name=gate
+#log off
+#
+## ---- VDS = -0.10 ----
+#load infile=solution_at_equilibrium
+#solve vgate=0 name=gate
+#solve vdrain=0 name=drain
+#solve vdrain=$"VD2" name=drain
+#
+#log outf=MU_IDVGS_VDS_0p10.log
+#solve vgate=$"VG_START" name=gate
+#solve vstep=$"VG_STEP" vfinal=$"VG_STOP" name=gate
+#log off
+#
+## ---- VDS = -0.20 ----
+#load infile=solution_at_equilibrium
+#solve vgate=0 name=gate
+#solve vdrain=0 name=drain
+#solve vdrain=$"VD3" name=drain
+#
+#log outf=MU_IDVGS_VDS_0p20.log
+#solve vgate=$"VG_START" name=gate
+#solve vstep=$"VG_STEP" vfinal=$"VG_STOP" name=gate
+#log off
+#
+## ---- VDS = -0.50 ----
+#load infile=solution_at_equilibrium
+#solve vgate=0 name=gate
+#solve vdrain=0 name=drain
+#solve vdrain=$"VD4" name=drain
+#
+#log outf=MU_IDVGS_VDS_0p50.log
+#solve vgate=$"VG_START" name=gate
+#solve vstep=$"VG_STEP" vfinal=$"VG_STOP" name=gate
+#log off
+#
+#
+#tonyplot -overlay MU_IDVGS_VDS_0p05.log MU_IDVGS_VDS_0p10.log MU_IDVGS_VDS_0p20.log MU_IDVGS_VDS_0p50.log 
+
+#############################################################
+
+
+
+ 
+####______IV_characteristics________
+##1. ID-VGS Charcterstics 
+#
+##solve vstep=-.25 vfinal=-1 name=drain 
+##
+##log outf = 0.ID_VGS_Charcterstics.log 
+##solve  vstep=-0.1 vfinal=-7 name=gate 
+##log off
+##
+##tonyplot 0.ID_VGS_Charcterstics.log
+#
+####2. ID-VDS Charcterstics 
+#solve vgate=0 vstep=-0.2 vfinal=-2 name=gate 
+#solve vdrain=0
+#
+#log outf = 1.ID_VDS_Charcterstics.log 
+#solve 	 vstep=-0.1 vfinal=-1.1 name=drain 
+#
+##Plot the electric field at velocity saturation
+#save outf=E_field_at_vel_sat.str
+#
+#solve  vstep=-0.1 vfinal=-6 name=drain 
+#log off
+#
+#tonyplot 1.ID_VDS_Charcterstics.log -set ID_VDS_set.set
+#tonyplot E_field_at_vel_sat.str
+#
+#
+#
+##_____DIBL analysis_____
+#
+#load infile=solution_at_equilibrium
+#
+##IV curves for DIBL
+##Curve for VD=-0.5
+#solve vdrain=-0.25
+#solve vdrain=-0.5
+#
+##Setting vgate before the log file starts recording and not inside the voltage sweep avoids glitches in the plots.
+#solve vgate=0
+#
+#log outf = 01_ID_VGS_V_drain0v5.log
+##These curves in this sweep are used to plot the energy band diagram for the PMOS device
+#save outf=10_ID_VGS_V_drain0v5_gate0.str
+#
+#solve vstep=-0.1 vfinal=-1 name=gate
+#save outf=11_ID_VGS_V_drain0v5_gate1.str
+#
+#solve vstep=-0.1 vfinal=-2 name=gate
+#save outf=12_ID_VGS_V_drain0v5_gate2.str
+#
+#solve vstep=-0.1 vfinal=-3 name=gate
+#save outf=13_ID_VGS_V_drain0v5_gate3.str
+#
+#log off
+#
+##Plot energy bands for a -0.5[V] V_drain PMOS for various values of V_G
+#tonyplot 10_ID_VGS_V_drain0v5_gate0.str 11_ID_VGS_V_drain0v5_gate1.str 12_ID_VGS_V_drain0v5_gate2.str 13_ID_VGS_V_drain0v5_gate3.str -set energy_band_set.set
+#
+#
+#save outf=01_ID_VGS_V_drain0v5.str
+#
+#
+#
+##Curve for VD=-0.5
+#solve vdrain=-0.75
+#solve vdrain=-1
+#
+#solve vgate=0
+#log outf = 02_ID_VGS_V_drain1.log
+#solve vstep=-0.1 vfinal=-3 name=gate
+#log off
+#save outf=02_ID_VGS_V_drain1.str
+#
+#
+#
+##Curve for VD=-1.5
+#solve vdrain=-1.25
+#solve vdrain=-1.5
+#
+#solve vgate=0
+#log outf = 03_ID_VGS_V_drain1v5.log
+#solve vstep=-0.1 vfinal=-3 name=gate
+#log off
+#save outf=03_ID_VGS_V_drain1v5.str
+#
+#
+#
+##Curve for VD=-2
+#solve vdrain=-1.75
+#solve vdrain=-2
+#
+#solve vgate=0
+#log outf = 04_ID_VGS_V_drain2.log
+#solve vstep=-0.1 vfinal=-3 name=gate
+#log off
+#save outf=04_ID_VGS_V_drain2.str
+#
+#
+#
+##Curve for VD=-2.5
+#solve vdrain=-2.25
+#solve vdrain=-2.5
+#
+#solve vgate=0
+#log outf = 05_ID_VGS_V_drain2v5.log
+#solve vstep=-0.1 vfinal=-3 name=gate
+#log off
+#save outf=05_ID_VGS_V_drain2v5.str
+#
+#
+#
+##Curve for VD=-3
+#solve vdrain=-2.75
+#solve vdrain=-3
+#solve vgate=0
+#
+#log outf = 06_ID_VGS_V_drain3.log
+#
+##These curves in this sweep are used to plot the energy band diagram for the PMOS device
+#save outf=10_ID_VGS_V_drain3_gate0.str
+#
+#solve vstep=-0.1 vfinal=-1 name=gate
+#save outf=11_ID_VGS_V_drain3_gate1.str
+#
+#solve vstep=-0.1 vfinal=-2 name=gate
+#save outf=12_ID_VGS_V_drain3_gate2.str
+#
+#solve vstep=-0.1 vfinal=-3 name=gate
+#save outf=13_ID_VGS_V_drain3_gate3.str
+#
+#save outf=06_ID_VGS_V_drain3.str
+#
+##Plot energy bands for a -3[V] V_drain PMOS for various values of V_G (This and the previous tonyplot indicate stark differences in the band diagram due to lowering).
+#tonyplot 10_ID_VGS_V_drain3_gate0.str 11_ID_VGS_V_drain3_gate1.str 12_ID_VGS_V_drain3_gate2.str 13_ID_VGS_V_drain3_gate3.str -set energy_band_set.set
+#log off
+#
+#
+##Plot the ID-VGS DIBL curves and structure files
+#tonyplot -overlay 01_ID_VGS_V_drain0v5.log 02_ID_VGS_V_drain1.log 03_ID_VGS_V_drain1v5.log 04_ID_VGS_V_drain2.log 05_ID_VGS_V_drain2v5.log 06_ID_VGS_V_drain3.log
+#
+##Electric field plots
+#tonyplot 01_ID_VGS_V_drain0v5.str 02_ID_VGS_V_drain1.str 03_ID_VGS_V_drain1v5.str 04_ID_VGS_V_drain2.str 05_ID_VGS_V_drain2v5.str 06_ID_VGS_V_drain3.str -set E_field.set
+#
+#
+#
+##___Extract VTH values for DIBL calcuation___
+#
+##1.Get V_T for V_D = 0[V]
+#load infile=solution_at_equilibrium
+#
+#solve vdrain=0
+#
+#solve vgate=0 vstep=0.1 vfinal=1 name=gate
+#log outf = 00Electron_hole_con_vs_VG_VD_0.log
+#solve vstep =-0.1 vfinal=-4 name=gate
+#log off
+#
+#extract init infile="00Electron_hole_con_vs_VG_VD_0.log"
+#extract name="VTN0" x.val from curve(v."gate", probe."Hole con") where y.val=$"substrate_doping"
+#
+##2.Get V_T for V_D = -1.5[V]
+#load infile=solution_at_equilibrium
+#
+#solve vdrain=0 vstep=-0.1 vfinal=-1.5 name=drain
+#
+#solve vgate=0 vstep=0.1 vfinal=1 name=gate
+#log outf = 01Electron_hole_con_vs_VG_VD2.log
+#solve vstep =-0.1 vfinal=-4 name=gate
+#log off
+#
+#extract init infile="00Electron_hole_con_vs_VG_VD2.log"
+#extract name="VTN1" x.val from curve(v."gate", probe."Hole con") where y.val=$"substrate_doping"
+#
+##1.Get V_T for V_D = -2.5[V]
+#load infile=solution_at_equilibrium
+#
+#solve vdrain=0 vstep=-0.1 vfinal=-2.5 name=drain
+#
+#solve vgate=0 vstep=0.1 vfinal=1 name=gate
+#log outf = 01Electron_hole_con_vs_VG_VD25.log
+#solve vstep =-0.1 vfinal=-4 name=gate
+#log off
+#
+#extract init infile="01Electron_hole_con_vs_VG_VD25.log"
+#extract name="VTN2" x.val from curve(v."gate", probe."Hole con") where y.val=$"substrate_doping"
+#
+#set DIBL = (($"VTN1" -1.5/2) - ($"VTN2" -2.5/2))/(-2.5-(-2))
+#
+#tonyplot -overlay 00Electron_hole_con_vs_VG_VD2.log 01Electron_hole_con_vs_VG_VD25.log
+#
+
+#Ion and Ioff optimization sweeps
+#ID-VDS Charcterstics
+ 
+#1. On-current
+solve vstep=-.2 vfinal=-1.2 name=gate 
+
+log outf = On_current.log 
+solve  vstep=-0.3 vfinal=-1.2 name=drain 
+log off
+
+extract init infile = "On_current.log"
+extract name="I_on" min(i."drain")
+
+tonyplot On_current.log
+
+#2. Off current
+solve vdrain=0
+solve vgate=0
+log outf = Off_current.log 
+solve  	vstep=-0.2 vfinal=-1.2 name=drain
+log off
+
+tonyplot Off_current.log -set ID_VGS.set
+
+extract init infile = "Off_current.log"
+extract name="I_off" min(i."drain")
